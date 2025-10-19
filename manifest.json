@@ -1,10 +1,10 @@
 {
-  "name": "Ruleta de Tareas y Recompensas",
-  "short_name": "Ruleta",
+  "name": "Tiempo & Recompensas",
+  "short_name": "Tiempo",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#f0f2f5",
-  "theme_color": "#ff6b6b",
+  "background_color": "#ffffff",
+  "theme_color": "#0b84ff",
   "icons": [
     {
       "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAA...",
