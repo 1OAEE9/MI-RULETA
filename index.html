@@ -1,175 +1,385 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ruleta de Tareas y Recompensas</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#ff6b6b">
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
-<script>
-  // Registrar el Service Worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js')
-      .then(() => console.log('Service Worker registrado'))
-      .catch(err => console.log('Error Service Worker:', err));
-  }
-</script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Ruleta Minimal - Tareas & Recompensas</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#ffffff" />
 <style>
-body { font-family: 'Montserrat', sans-serif; text-align:center; padding:10px; background:#f0f2f5; margin:0; overflow-x:hidden; }
-h1 { color:#2a2a2a; font-size:1.8em; }
-.ruleta-container {
-  margin:20px auto;
-  width:80vw;
-  height:80vw;
-  max-width:300px;
-  max-height:300px;
-  border-radius:50%;
-  background: radial-gradient(circle,#ff6b6b,#1d3557);
-  display:flex; align-items:center; justify-content:center;
-  color:white; font-size:16px; padding:20px; text-align:center; word-wrap:break-word;
-  box-shadow:0 4px 10px rgba(0,0,0,0.2);
-  transition: transform 3s cubic-bezier(0.25,1,0.5,1);
-}
-button { padding:12px 20px; margin:5px; cursor:pointer; border:none; border-radius:8px; font-weight:600; font-size:16px; transition: transform 0.2s; }
-button:hover { transform: scale(1.05); }
-input { padding:8px; font-size:16px; margin-right:5px; border-radius:5px; border:1px solid #ccc; width:60%; max-width:250px; }
-ul { list-style:none; padding:0; max-height:30vh; overflow-y:auto; }
-li { margin:5px 0; display:flex; justify-content:space-between; align-items:center; }
-.itemBtn { padding:2px 6px; font-size:12px; background:#ff6b6b; color:white; border:none; border-radius:4px; cursor:pointer; }
-.pantalla { display:none; }
+  :root{
+    --bg:#ffffff;
+    --accent:#0b84ff;
+    --muted:#6b7280;
+    --card:#f7f8fa;
+    --danger:#ef4444;
+    --radius:12px;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  .app{min-height:100%;display:flex;flex-direction:column;}
+  header{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #eee;position:relative;}
+  .menuBtn{width:40px;height:40px;border-radius:9px;border:none;background:transparent;font-size:22px;cursor:pointer;}
+  h1{flex:1;margin:0;font-size:16px;text-align:center;font-weight:600;color:#111;}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:18px;}
+  .bigBtn{
+    width:86vw; max-width:420px;
+    background:linear-gradient(180deg, #fff, #fbfdff);
+    border:1px solid #e6eefc;
+    box-shadow:0 6px 20px rgba(11,132,255,0.08);
+    padding:18px;border-radius:14px;font-weight:700;color:var(--accent);
+    font-size:18px;cursor:pointer;
+  }
+  .secondary{background:var(--card);border:1px solid #ececec;color:#111;box-shadow:none;}
+  .smallNote{font-size:13px;color:var(--muted);margin-top:-8px}
+  /* Off-canvas menu */
+  .drawer{position:fixed;left:-100%;top:0;height:100vh;width:86vw;max-width:360px;background:#fff;box-shadow:4px 0 24px rgba(0,0,0,0.08);transition:left .25s ease;z-index:60;padding:18px;display:flex;flex-direction:column;gap:12px;}
+  .drawer.open{left:0;}
+  .closeDrawer{align-self:flex-end;border:none;background:transparent;font-size:20px;cursor:pointer}
+  nav button{display:block;width:100%;text-align:left;padding:10px;border-radius:10px;border:none;background:transparent;font-weight:600;cursor:pointer}
+  /* Views */
+  .view{display:none;padding:12px;}
+  .view.active{display:block;}
+  .card{background:var(--card);padding:12px;border-radius:10px;border:1px solid #eee;}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  input[type="text"], input[type="number"], select {
+    width:100%;padding:10px;border-radius:8px;border:1px solid #e6e6e6;font-size:15px;box-sizing:border-box;
+  }
+  .row{display:flex;gap:8px}
+  .row .flex{flex:1}
+  ul.list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;max-height:34vh;overflow:auto}
+  li.item{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;background:#fff;border:1px solid #f0f0f0}
+  .miniBtn{padding:6px 8px;border-radius:8px;border:none;cursor:pointer;font-weight:600}
+  .del{background:transparent;color:var(--danger);border:1px solid rgba(239,68,68,.08)}
+  .primary{background:var(--accent);color:#fff}
+  footer{padding:8px 16px;border-top:1px solid #eee;font-size:13px;color:var(--muted);text-align:center}
+  /* History table minimal */
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  td,th{padding:8px;border-bottom:1px solid #f2f2f2;text-align:left}
+  th{font-weight:700;color:var(--muted);font-size:13px}
+  .totals{display:flex;gap:12px;flex-wrap:wrap}
+  .totalCard{padding:10px;border-radius:10px;background:#fff;border:1px solid #f0f0f0;min-width:128px}
+  /* Responsive tweaks */
+  @media(min-width:700px){ main{padding:40px} .bigBtn{max-width:360px;font-size:20px} }
 </style>
 </head>
 <body>
+<div class="app">
+  <header>
+    <button class="menuBtn" id="openMenu" aria-label="menu">☰</button>
+    <h1>Tiempo & Recompensas</h1>
+    <div style="width:40px"></div>
+  </header>
 
-<h1>Ruleta de Tareas y Recompensas</h1>
+  <!-- Drawer -->
+  <aside class="drawer" id="drawer">
+    <button class="closeDrawer" id="closeMenu">✕</button>
+    <nav>
+      <button onclick="showView('editTasks')">Editar tareas</button>
+      <button onclick="showView('editRewards')">Editar recompensas</button>
+      <button onclick="showView('history')">Tiempos acumulados</button>
+      <hr/>
+      <button onclick="exportData()">Exportar JSON</button>
+      <button onclick="importPrompt()">Importar JSON</button>
+      <button onclick="clearAll()" style="color:var(--danger)">Borrar todo</button>
+    </nav>
+  </aside>
 
-<div id="pantallaRuleta" class="pantalla" style="display:block;">
-  <div>
-    <button onclick="mostrarPantalla('pantallaTareas')">Editar Tareas</button>
-    <button onclick="mostrarPantalla('pantallaRecompensas')">Editar Recompensas</button>
-  </div>
-  <div>
-    <button id="girarTareasBtn" onclick="girarTarea()">Girar ruleta de tareas</button>
-  </div>
-  <div class="ruleta-container" id="ruleta">¡Gira la ruleta!</div>
-  <div>
-    <button id="marcarCompletadaBtn" onclick="marcarCompletada()" style="display:none;">Marcar como completada</button>
-  </div>
-  <div>
-    <button id="girarRecompensasBtn" onclick="girarRecompensa()" style="display:none;">Girar ruleta de recompensas</button>
-  </div>
-  <p id="resultado" style="font-weight:600;"></p>
-</div>
+  <main>
+    <!-- Main view -->
+    <section id="mainView" class="view active">
+      <div style="width:100%;max-width:720px;">
+        <button class="bigBtn primary" onclick="openRegister('tarea')">Registrar tarea</button>
+        <div class="smallNote">Registra cuánto tiempo dedicaste a una tarea existente</div>
 
-<div id="pantallaTareas" class="pantalla">
-  <h2>Editar Tareas</h2>
-  <input type="text" id="inputTarea" placeholder="Nueva tarea">
-  <button onclick="agregarTarea()">Agregar tarea</button>
-  <ul id="listaTareas"></ul>
-  <button onclick="mostrarPantalla('pantallaRuleta')">Volver</button>
-</div>
+        <button class="bigBtn secondary" style="margin-top:10px" onclick="openRegister('recompensa')">Registrar recompensa</button>
+        <div class="smallNote">Registra cuánto tiempo disfrutaste de una recompensa</div>
 
-<div id="pantallaRecompensas" class="pantalla">
-  <h2>Editar Recompensas</h2>
-  <input type="text" id="inputRecompensa" placeholder="Nueva recompensa">
-  <button onclick="agregarRecompensa()">Agregar recompensa</button>
-  <ul id="listaRecompensas"></ul>
-  <button onclick="mostrarPantalla('pantallaRuleta')">Volver</button>
+        <button class="bigBtn" style="margin-top:10px" onclick="takeRandomTask()">Tomar una tarea</button>
+        <div class="smallNote">El sistema te arroja una tarea al azar</div>
+      </div>
+    </section>
+
+    <!-- Edit Tasks -->
+    <section id="editTasks" class="view">
+      <div class="card">
+        <label>Nueva tarea</label>
+        <div class="row">
+          <input id="newTask" type="text" placeholder="Ej: Estudiar francés">
+          <button class="miniBtn primary" onclick="addTask()">Añadir</button>
+        </div>
+      </div>
+      <div style="height:12px"></div>
+      <div class="card">
+        <label>Tareas</label>
+        <ul class="list" id="tasksList"></ul>
+      </div>
+    </section>
+
+    <!-- Edit Rewards -->
+    <section id="editRewards" class="view">
+      <div class="card">
+        <label>Nueva recompensa</label>
+        <div class="row">
+          <input id="newReward" type="text" placeholder="Ej: Ver episodio">
+          <button class="miniBtn primary" onclick="addReward()">Añadir</button>
+        </div>
+      </div>
+      <div style="height:12px"></div>
+      <div class="card">
+        <label>Recompensas</label>
+        <ul class="list" id="rewardsList"></ul>
+      </div>
+    </section>
+
+    <!-- History -->
+    <section id="history" class="view">
+      <div class="card">
+        <label>Totales</label>
+        <div class="totals" id="totalsContainer"></div>
+      </div>
+      <div style="height:12px"></div>
+      <div class="card">
+        <label>Historial (últimos 200 registros)</label>
+        <table id="historyTable">
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Nombre</th><th>Minutos</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Register modal (simple inline card) -->
+    <section id="register" class="view">
+      <div class="card">
+        <label id="regLabel">Registrar</label>
+        <div class="row" style="margin-top:8px">
+          <select id="regSelect" class="flex"></select>
+          <input id="regMinutes" type="number" min="1" placeholder="Min (ej 30)" style="width:110px"/>
+        </div>
+        <div style="height:10px"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="miniBtn" onclick="showView('mainView')">Cancelar</button>
+          <button class="miniBtn primary" onclick="saveRegister()">Guardar</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>App minimalista • Datos locales en tu dispositivo</footer>
 </div>
 
 <script>
-// Datos
-let tareas = JSON.parse(localStorage.getItem('tareas')) || [];
-let recompensas = JSON.parse(localStorage.getItem('recompensas')) || [];
-let tareaActual = '';
+/* -----------------------
+ Data model in localStorage
+ keys: tareas, recompensas, historial
+-------------------------*/
+const LS_TASKS = 'tareas_v1';
+const LS_REWARDS = 'recompensas_v1';
+const LS_HISTORY = 'historial_v1';
 
-// Guardado
-function guardarTareas(){ localStorage.setItem('tareas', JSON.stringify(tareas)); }
-function guardarRecompensas(){ localStorage.setItem('recompensas', JSON.stringify(recompensas)); }
+let tareas = JSON.parse(localStorage.getItem(LS_TASKS) || '[]');
+let recompensas = JSON.parse(localStorage.getItem(LS_REWARDS) || '[]');
+let historial = JSON.parse(localStorage.getItem(LS_HISTORY) || '[]');
 
-// Pantallas
-function mostrarPantalla(idPantalla){
-  document.querySelectorAll('.pantalla').forEach(div=>div.style.display='none');
-  document.getElementById(idPantalla).style.display='block';
+/* --- UI helpers --- */
+const drawer = document.getElementById('drawer');
+document.getElementById('openMenu').onclick = ()=>drawer.classList.add('open');
+document.getElementById('closeMenu').onclick = ()=>drawer.classList.remove('open');
+
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  drawer.classList.remove('open');
+  // when showing lists, refresh data
+  if(id==='editTasks') renderTasks();
+  if(id==='editRewards') renderRewards();
+  if(id==='history') renderHistory();
+  if(id==='mainView'){} // nothing
 }
 
-// Listas
-function actualizarListas(){
-  const listaTareas = document.getElementById('listaTareas');
-  listaTareas.innerHTML = '';
+/* --- Tasks / Rewards management --- */
+function saveAll(){
+  localStorage.setItem(LS_TASKS, JSON.stringify(tareas));
+  localStorage.setItem(LS_REWARDS, JSON.stringify(recompensas));
+  localStorage.setItem(LS_HISTORY, JSON.stringify(historial));
+}
+
+function addTask(){
+  const v = document.getElementById('newTask').value.trim();
+  if(!v) return alert('Escribe el nombre de la tarea');
+  if(tareas.includes(v)) { alert('La tarea ya existe'); return; }
+  tareas.unshift(v);
+  document.getElementById('newTask').value='';
+  saveAll(); renderTasks();
+}
+
+function addReward(){
+  const v = document.getElementById('newReward').value.trim();
+  if(!v) return alert('Escribe la recompensa');
+  if(recompensas.includes(v)) { alert('La recompensa ya existe'); return; }
+  recompensas.unshift(v);
+  document.getElementById('newReward').value='';
+  saveAll(); renderRewards();
+}
+
+function renderTasks(){
+  const ul = document.getElementById('tasksList'); ul.innerHTML='';
+  if(tareas.length===0){ ul.innerHTML='<div style="color:var(--muted);padding:6px">Sin tareas</div>'; return;}
   tareas.forEach((t,i)=>{
-    const li = document.createElement('li'); li.textContent=t;
-    const btn = document.createElement('button'); btn.textContent='Eliminar'; btn.className='itemBtn';
-    btn.onclick=()=>{ tareas.splice(i,1); guardarTareas(); actualizarListas(); };
-    li.appendChild(btn); listaTareas.appendChild(li);
+    const li = document.createElement('li'); li.className='item';
+    const span = document.createElement('div'); span.textContent=t;
+    const btns = document.createElement('div');
+    const del = document.createElement('button'); del.className='miniBtn del'; del.textContent='Eliminar';
+    del.onclick = ()=>{ if(confirm('Eliminar tarea "'+t+'"?')){ tareas.splice(i,1); saveAll(); renderTasks(); } };
+    btns.appendChild(del); li.appendChild(span); li.appendChild(btns); ul.appendChild(li);
   });
+}
 
-  const listaRecompensas = document.getElementById('listaRecompensas');
-  listaRecompensas.innerHTML='';
+function renderRewards(){
+  const ul = document.getElementById('rewardsList'); ul.innerHTML='';
+  if(recompensas.length===0){ ul.innerHTML='<div style="color:var(--muted);padding:6px">Sin recompensas</div>'; return;}
   recompensas.forEach((r,i)=>{
-    const li=document.createElement('li'); li.textContent=r;
-    const btn=document.createElement('button'); btn.textContent='Eliminar'; btn.className='itemBtn';
-    btn.onclick=()=>{ recompensas.splice(i,1); guardarRecompensas(); actualizarListas(); };
-    li.appendChild(btn); listaRecompensas.appendChild(li);
+    const li = document.createElement('li'); li.className='item';
+    const span = document.createElement('div'); span.textContent=r;
+    const btns = document.createElement('div');
+    const del = document.createElement('button'); del.className='miniBtn del'; del.textContent='Eliminar';
+    del.onclick = ()=>{ if(confirm('Eliminar recompensa "'+r+'"?')){ recompensas.splice(i,1); saveAll(); renderRewards(); } };
+    btns.appendChild(del); li.appendChild(span); li.appendChild(btns); ul.appendChild(li);
   });
 }
 
-// Ruleta
-function girarRuleta(callback){
-  const ruleta = document.getElementById('ruleta');
-  const grados=Math.floor(Math.random()*360 + 720);
-  ruleta.style.transition='transform 3s cubic-bezier(0.25,1,0.5,1)';
-  ruleta.style.transform=`rotate(${grados}deg)`;
-  setTimeout(callback,3000);
+/* --- Register flows --- */
+let registerMode = null; // 'tarea' or 'recompensa'
+function openRegister(mode){
+  registerMode = mode;
+  const label = document.getElementById('regLabel');
+  const sel = document.getElementById('regSelect');
+  sel.innerHTML = '';
+  if(mode==='tarea'){
+    label.textContent = 'Registrar tiempo en tarea';
+    if(tareas.length===0){ alert('No hay tareas. Añade alguna en el menú.'); return; }
+    tareas.forEach(t=>{ const o = document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o); });
+  } else {
+    label.textContent = 'Registrar tiempo en recompensa';
+    if(recompensas.length===0){ alert('No hay recompensas. Añade alguna en el menú.'); return; }
+    recompensas.forEach(r=>{ const o = document.createElement('option'); o.value=r; o.textContent=r; sel.appendChild(o); });
+  }
+  document.getElementById('regMinutes').value='';
+  showView('register');
 }
 
-// Agregar elementos
-function agregarTarea(){
-  const t=document.getElementById('inputTarea').value.trim();
-  if(t){ tareas.push(t); guardarTareas(); actualizarListas(); document.getElementById('inputTarea').value=''; }
-}
-function agregarRecompensa(){
-  const r=document.getElementById('inputRecompensa').value.trim();
-  if(r){ recompensas.push(r); guardarRecompensas(); actualizarListas(); document.getElementById('inputRecompensa').value=''; }
+function saveRegister(){
+  const sel = document.getElementById('regSelect');
+  const minutos = parseInt(document.getElementById('regMinutes').value,10);
+  if(!sel.value) return alert('Selecciona un elemento');
+  if(!minutos || minutos<=0) return alert('Introduce minutos válidos (>0)');
+  const entry = {
+    tipo: registerMode==='tarea'?'tarea':'recompensa',
+    nombre: sel.value,
+    minutos: minutos,
+    fechaISO: new Date().toISOString()
+  };
+  historial.unshift(entry);
+  // keep reasonable size
+  if(historial.length>2000) historial = historial.slice(0,2000);
+  saveAll();
+  alert('Registrado: '+sel.value+' — '+minutos+' min');
+  showView('mainView');
 }
 
-// Funciones principales
-function girarTarea(){
-  if(tareas.length===0){ alert('No hay tareas agregadas!'); return; }
-  girarRuleta(()=>{
-    const index=Math.floor(Math.random()*tareas.length);
-    tareaActual=tareas[index];
-    document.getElementById('ruleta').textContent=tareaActual;
-    document.getElementById('resultado').textContent='Tarea seleccionada: '+tareaActual;
-    document.getElementById('marcarCompletadaBtn').style.display='inline-block';
-    document.getElementById('girarTareasBtn').style.display='none';
-    document.getElementById('ruleta').style.transition='none';
-    document.getElementById('ruleta').style.transform='rotate(0deg)';
+/* --- Random task --- */
+function takeRandomTask(){
+  if(tareas.length===0){ alert('No hay tareas registradas. Añade algunas en el menú.'); return; }
+  const idx = Math.floor(Math.random()*tareas.length);
+  const t = tareas[idx];
+  if(confirm('Tarea aleatoria:\n\n'+t+'\n\n¿Deseas registrar tiempo ahora?')){
+    // open register with that task preselected
+    openRegister('tarea');
+    // set selected option
+    setTimeout(()=>{ const sel=document.getElementById('regSelect'); sel.value = t; }, 200);
+  }
+}
+
+/* --- History and totals --- */
+function renderHistory(){
+  const tbody = document.querySelector('#historyTable tbody'); tbody.innerHTML='';
+  const max = Math.min(historial.length, 200);
+  for(let i=0;i<max;i++){
+    const e = historial[i];
+    const tr = document.createElement('tr');
+    const d = new Date(e.fechaISO);
+    tr.innerHTML = '<td>'+d.toLocaleString()+'</td><td style="text-transform:capitalize">'+e.tipo+'</td><td>'+e.nombre+'</td><td>'+e.minutos+'</td>';
+    tbody.appendChild(tr);
+  }
+  // totals
+  const totals = {};
+  let totalTareas = 0, totalRecompensas = 0;
+  historial.forEach(h=>{
+    totals[h.nombre] = (totals[h.nombre] || 0) + h.minutos;
+    if(h.tipo==='tarea') totalTareas += h.minutos;
+    else totalRecompensas += h.minutos;
   });
-}
-function marcarCompletada(){
-  document.getElementById('resultado').textContent='¡Tarea completada! Gira para ver tu recompensa.';
-  document.getElementById('marcarCompletadaBtn').style.display='none';
-  document.getElementById('girarRecompensasBtn').style.display='inline-block';
-}
-function girarRecompensa(){
-  if(recompensas.length===0){ alert('No hay recompensas agregadas!'); return; }
-  girarRuleta(()=>{
-    const index=Math.floor(Math.random()*recompensas.length);
-    const recompensa=recompensas[index];
-    document.getElementById('ruleta').textContent=recompensa;
-    document.getElementById('resultado').textContent='¡Has ganado: '+recompensa+'!';
-    document.getElementById('girarRecompensasBtn').style.display='none';
-    document.getElementById('girarTareasBtn').style.display='inline-block';
-    document.getElementById('ruleta').style.transition='none';
-    document.getElementById('ruleta').style.transform='rotate(0deg)';
-  });
+  const cont = document.getElementById('totalsContainer'); cont.innerHTML='';
+  const t1 = document.createElement('div'); t1.className='totalCard'; t1.innerHTML = '<strong>Total tareas</strong><div style="font-size:18px;margin-top:6px">'+totalTareas+' min</div>';
+  const t2 = document.createElement('div'); t2.className='totalCard'; t2.innerHTML = '<strong>Total recompensas</strong><div style="font-size:18px;margin-top:6px">'+totalRecompensas+' min</div>';
+  cont.appendChild(t1); cont.appendChild(t2);
+  // top 5 items by time
+  const arr = Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  if(arr.length){
+    const title = document.createElement('div'); title.style.width='100%'; title.style.marginTop='8px'; title.innerHTML='<strong>Top items por minutos</strong>';
+    cont.appendChild(title);
+    arr.forEach(([name,mins])=>{
+      const c = document.createElement('div'); c.className='totalCard'; c.innerHTML = '<div style="font-weight:600">'+name+'</div><div style="color:var(--muted)">'+mins+' min</div>';
+      cont.appendChild(c);
+    });
+  }
 }
 
-// Inicializar
-actualizarListas();
+/* --- Export / Import / Clear --- */
+function exportData(){
+  const data = { tareas, recompensas, historial };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'ruleta-data.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importPrompt(){
+  const input = document.createElement('input'); input.type='file'; input.accept='.json';
+  input.onchange = e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const reader = new FileReader();
+    reader.onload = ev=>{
+      try{
+        const obj = JSON.parse(ev.target.result);
+        if(obj.tareas && obj.recompensas && obj.historial){
+          if(confirm('Importar datos: esto reemplazará los datos actuales. ¿Continuar?')){
+            tareas = obj.tareas; recompensas = obj.recompensas; historial = obj.historial;
+            saveAll(); renderTasks(); renderRewards(); alert('Importado con éxito');
+          }
+        }else alert('Archivo inválido');
+      }catch(err){ alert('Error leyendo archivo'); }
+    };
+    reader.readAsText(f);
+  };
+  input.click();
+}
+
+function clearAll(){
+  if(!confirm('Borrar todo (tareas, recompensas e historial)?')) return;
+  tareas = []; recompensas = []; historial = []; saveAll(); renderTasks(); renderRewards(); alert('Datos borrados');
+}
+
+/* initialize UI */
+renderTasks();
+renderRewards();
+renderHistory();
+
+/* Register service worker (if hosted) */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('service-worker.js').catch(()=>{/* ignore in local file view */});
+}
 </script>
-
 </body>
 </html>
+
