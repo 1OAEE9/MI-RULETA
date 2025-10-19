@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ruleta de Tareas y Recompensas</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b6b">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+<script>
+  // Registrar el Service Worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(() => console.log('Service Worker registrado'))
+      .catch(err => console.log('Error Service Worker:', err));
+  }
+</script>
+<style>
+body { font-family: 'Montserrat', sans-serif; text-align:center; padding:10px; background:#f0f2f5; margin:0; overflow-x:hidden; }
+h1 { color:#2a2a2a; font-size:1.8em; }
+.ruleta-container {
+  margin:20px auto;
+  width:80vw;
+  height:80vw;
+  max-width:300px;
+  max-height:300px;
+  border-radius:50%;
+  background: radial-gradient(circle,#ff6b6b,#1d3557);
+  display:flex; align-items:center; justify-content:center;
+  color:white; font-size:16px; padding:20px; text-align:center; word-wrap:break-word;
+  box-shadow:0 4px 10px rgba(0,0,0,0.2);
+  transition: transform 3s cubic-bezier(0.25,1,0.5,1);
+}
+button { padding:12px 20px; margin:5px; cursor:pointer; border:none; border-radius:8px; font-weight:600; font-size:16px; transition: transform 0.2s; }
+button:hover { transform: scale(1.05); }
+input { padding:8px; font-size:16px; margin-right:5px; border-radius:5px; border:1px solid #ccc; width:60%; max-width:250px; }
+ul { list-style:none; padding:0; max-height:30vh; overflow-y:auto; }
+li { margin:5px 0; display:flex; justify-content:space-between; align-items:center; }
+.itemBtn { padding:2px 6px; font-size:12px; background:#ff6b6b; color:white; border:none; border-radius:4px; cursor:pointer; }
+.pantalla { display:none; }
+</style>
+</head>
+<body>
+
+<h1>Ruleta de Tareas y Recompensas</h1>
+
+<div id="pantallaRuleta" class="pantalla" style="display:block;">
+  <div>
+    <button onclick="mostrarPantalla('pantallaTareas')">Editar Tareas</button>
+    <button onclick="mostrarPantalla('pantallaRecompensas')">Editar Recompensas</button>
+  </div>
+  <div>
+    <button id="girarTareasBtn" onclick="girarTarea()">Girar ruleta de tareas</button>
+  </div>
+  <div class="ruleta-container" id="ruleta">¡Gira la ruleta!</div>
+  <div>
+    <button id="marcarCompletadaBtn" onclick="marcarCompletada()" style="display:none;">Marcar como completada</button>
+  </div>
+  <div>
+    <button id="girarRecompensasBtn" onclick="girarRecompensa()" style="display:none;">Girar ruleta de recompensas</button>
+  </div>
+  <p id="resultado" style="font-weight:600;"></p>
+</div>
+
+<div id="pantallaTareas" class="pantalla">
+  <h2>Editar Tareas</h2>
+  <input type="text" id="inputTarea" placeholder="Nueva tarea">
+  <button onclick="agregarTarea()">Agregar tarea</button>
+  <ul id="listaTareas"></ul>
+  <button onclick="mostrarPantalla('pantallaRuleta')">Volver</button>
+</div>
+
+<div id="pantallaRecompensas" class="pantalla">
+  <h2>Editar Recompensas</h2>
+  <input type="text" id="inputRecompensa" placeholder="Nueva recompensa">
+  <button onclick="agregarRecompensa()">Agregar recompensa</button>
+  <ul id="listaRecompensas"></ul>
+  <button onclick="mostrarPantalla('pantallaRuleta')">Volver</button>
+</div>
+
+<script>
+// Datos
+let tareas = JSON.parse(localStorage.getItem('tareas')) || [];
+let recompensas = JSON.parse(localStorage.getItem('recompensas')) || [];
+let tareaActual = '';
+
+// Guardado
+function guardarTareas(){ localStorage.setItem('tareas', JSON.stringify(tareas)); }
+function guardarRecompensas(){ localStorage.setItem('recompensas', JSON.stringify(recompensas)); }
+
+// Pantallas
+function mostrarPantalla(idPantalla){
+  document.querySelectorAll('.pantalla').forEach(div=>div.style.display='none');
+  document.getElementById(idPantalla).style.display='block';
+}
+
+// Listas
+function actualizarListas(){
+  const listaTareas = document.getElementById('listaTareas');
+  listaTareas.innerHTML = '';
+  tareas.forEach((t,i)=>{
+    const li = document.createElement('li'); li.textContent=t;
+    const btn = document.createElement('button'); btn.textContent='Eliminar'; btn.className='itemBtn';
+    btn.onclick=()=>{ tareas.splice(i,1); guardarTareas(); actualizarListas(); };
+    li.appendChild(btn); listaTareas.appendChild(li);
+  });
+
+  const listaRecompensas = document.getElementById('listaRecompensas');
+  listaRecompensas.innerHTML='';
+  recompensas.forEach((r,i)=>{
+    const li=document.createElement('li'); li.textContent=r;
+    const btn=document.createElement('button'); btn.textContent='Eliminar'; btn.className='itemBtn';
+    btn.onclick=()=>{ recompensas.splice(i,1); guardarRecompensas(); actualizarListas(); };
+    li.appendChild(btn); listaRecompensas.appendChild(li);
+  });
+}
+
+// Ruleta
+function girarRuleta(callback){
+  const ruleta = document.getElementById('ruleta');
+  const grados=Math.floor(Math.random()*360 + 720);
+  ruleta.style.transition='transform 3s cubic-bezier(0.25,1,0.5,1)';
+  ruleta.style.transform=`rotate(${grados}deg)`;
+  setTimeout(callback,3000);
+}
+
+// Agregar elementos
+function agregarTarea(){
+  const t=document.getElementById('inputTarea').value.trim();
+  if(t){ tareas.push(t); guardarTareas(); actualizarListas(); document.getElementById('inputTarea').value=''; }
+}
+function agregarRecompensa(){
+  const r=document.getElementById('inputRecompensa').value.trim();
+  if(r){ recompensas.push(r); guardarRecompensas(); actualizarListas(); document.getElementById('inputRecompensa').value=''; }
+}
+
+// Funciones principales
+function girarTarea(){
+  if(tareas.length===0){ alert('No hay tareas agregadas!'); return; }
+  girarRuleta(()=>{
+    const index=Math.floor(Math.random()*tareas.length);
+    tareaActual=tareas[index];
+    document.getElementById('ruleta').textContent=tareaActual;
+    document.getElementById('resultado').textContent='Tarea seleccionada: '+tareaActual;
+    document.getElementById('marcarCompletadaBtn').style.display='inline-block';
+    document.getElementById('girarTareasBtn').style.display='none';
+    document.getElementById('ruleta').style.transition='none';
+    document.getElementById('ruleta').style.transform='rotate(0deg)';
+  });
+}
+function marcarCompletada(){
+  document.getElementById('resultado').textContent='¡Tarea completada! Gira para ver tu recompensa.';
+  document.getElementById('marcarCompletadaBtn').style.display='none';
+  document.getElementById('girarRecompensasBtn').style.display='inline-block';
+}
+function girarRecompensa(){
+  if(recompensas.length===0){ alert('No hay recompensas agregadas!'); return; }
+  girarRuleta(()=>{
+    const index=Math.floor(Math.random()*recompensas.length);
+    const recompensa=recompensas[index];
+    document.getElementById('ruleta').textContent=recompensa;
+    document.getElementById('resultado').textContent='¡Has ganado: '+recompensa+'!';
+    document.getElementById('girarRecompensasBtn').style.display='none';
+    document.getElementById('girarTareasBtn').style.display='inline-block';
+    document.getElementById('ruleta').style.transition='none';
+    document.getElementById('ruleta').style.transform='rotate(0deg)';
+  });
+}
+
+// Inicializar
+actualizarListas();
+</script>
+
+</body>
+</html>
